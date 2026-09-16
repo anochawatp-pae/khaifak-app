@@ -807,11 +807,11 @@ function buildAnalysisPrompt(f) {
 ${ANALYSIS_SCHEMA_NOTE}`;
 }
 
-async function analyzeLand(f) {
+async function analyzeLand(f, useSearch = true) {
   return callClaude({
     system: "คุณคือผู้เชี่ยวชาญประเมินที่ดินและความเสี่ยงธุรกิจขายฝากในประเทศไทย ตอบเป็น JSON เท่านั้น",
     prompt: buildAnalysisPrompt(f),
-    useSearch: true,
+    useSearch,
   });
 }
 
@@ -1059,11 +1059,12 @@ function RecommendedTab({ history, setHistory }) {
       for (let i = 0; i < candidates.length; i++) {
         const c = candidates[i];
         setProgress(`กำลังประเมินแปลงที่ ${i + 1} จาก ${candidates.length}: ${c.title || ""}`);
+        if (i > 0) await new Promise((r) => setTimeout(r, 2000));
         try {
           const result = await analyzeLand({
             province: c.location, district: "", sizeRai: c.size, deedType: c.deedType,
             askingPrice: c.price, appraisedValue: "", features: c.highlight,
-          });
+          }, false);
           if (result.overall_score >= INVEST_THRESHOLD) {
             qualifying.push({ candidate: c, result });
           } else {
