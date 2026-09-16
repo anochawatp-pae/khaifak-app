@@ -44,6 +44,13 @@ const FONT_CSS = `
 --------------------------------------------------------- */
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
+function withTimeout(promise, ms, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}
+
 function compressImage(file, maxDim = 1200, quality = 0.6) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -457,14 +464,19 @@ function ContractPhoto({ plotId }) {
   const handleFile = async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
+    if (/heic|heif/i.test(file.type) || /\.hei[cf]$/i.test(file.name)) {
+      setError("ไฟล์นี้เป็นสกุล HEIC/HEIF ซึ่งเบราว์เซอร์เปิดไม่ได้ กรุณาเปลี่ยนการตั้งค่ากล้องเป็นถ่ายรูปแบบ JPG ก่อน หรือแปลงไฟล์เป็น JPG แล้วลองใหม่");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
     setBusy(true);
     setError("");
     try {
-      const dataUrl = await compressImage(file);
+      const dataUrl = await withTimeout(compressImage(file), 15000, "บีบอัดรูปนานเกินไป (เกิน 15 วินาที) ลองใช้รูปที่มีขนาดเล็กกว่านี้");
       if (dataUrl.length > 900000) {
         throw new Error("ไฟล์รูปใหญ่เกินไปแม้บีบอัดแล้ว ลองถ่ายรูปให้ห่างขึ้นหรือใช้รูปที่มีขนาดเล็กกว่านี้");
       }
-      await storage.set(`plot_photo:${plotId}`, dataUrl);
+      await withTimeout(storage.set(`plot_photo:${plotId}`, dataUrl), 15000, "บันทึกลงฐานข้อมูลนานเกินไป (เกิน 15 วินาที) เช็กอินเทอร์เน็ตแล้วลองใหม่");
       setPhoto(dataUrl);
     } catch (err) {
       setError("บันทึกรูปไม่สำเร็จ: " + (err.message || "ลองใหม่อีกครั้ง"));

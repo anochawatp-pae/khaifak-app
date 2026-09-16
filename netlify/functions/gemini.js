@@ -30,7 +30,7 @@ export const handler = async (event) => {
   // Check ai.google.dev/gemini-api/docs/models for the current free-tier model
   // list — model names/availability change over time. Override via the
   // GEMINI_MODEL env var without redeploying code.
-  const model = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
   const body = {
     contents: [{ role: "user", parts: [{ text: prompt }] }],
