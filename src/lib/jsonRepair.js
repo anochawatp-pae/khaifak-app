@@ -36,8 +36,8 @@ export function tryRepairJSON(str) {
 
 export function extractJSON(text) {
   const start = text.indexOf("{");
-  if (start === -1) throw new Error("no json found in response");
+  if (start === -1) throw new Error("no json found in response — raw text: " + text.slice(0, 400));
   const result = tryRepairJSON(text.slice(start));
-  if (result === null) throw new Error("could not parse or repair JSON");
+  if (result === null) throw new Error("could not parse or repair JSON — raw text: " + text.slice(start, start + 500));
   return result;
 }
