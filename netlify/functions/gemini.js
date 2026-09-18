@@ -44,7 +44,7 @@ export const handler = async (event) => {
 
   const body = {
     contents: [{ role: "user", parts }],
-    generationConfig: { maxOutputTokens: 3200, temperature: 0.4 },
+    generationConfig: { maxOutputTokens: 4096, temperature: 0.4 },
   };
   if (system) {
     body.systemInstruction = { parts: [{ text: system }] };

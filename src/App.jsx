@@ -133,17 +133,17 @@ const CATEGORY_LABELS = [
   ["returnIfForeclosed", "ผลตอบแทนกรณีที่ดินหลุดเป็นกรรมสิทธิ์"],
 ];
 
-const ANALYSIS_SCHEMA_NOTE = `ตอบกลับเป็น JSON ล้วนเท่านั้น ห้ามมีข้อความอื่นนอกเหนือจาก JSON และห้ามใช้ markdown code fence โครงสร้างต้องเป็น:
+const ANALYSIS_SCHEMA_NOTE = `ตอบกลับเป็น JSON ล้วนเท่านั้น ห้ามมีข้อความอื่นนอกเหนือจาก JSON และห้ามใช้ markdown code fence สำคัญมาก: ต้องใส่ "resale" กับ "market_price_estimate" ให้ครบก่อนเสมอ ห้ามปล่อยว่างแม้ต้องเขียน "categories.note" ให้สั้นลงก็ตาม โครงสร้างต้องเป็น (เรียงตามลำดับนี้เป๊ะ):
 {
  "overall_score": number (0-10 ทศนิยม 1 ตำแหน่ง),
  "verdict": "น่าลงทุน" | "ควรพิจารณาเพิ่มเติม" | "ไม่แนะนำ",
- "categories": [ {"key":"location","score":number,"note":"เหตุผลสั้นไม่เกิน 12 คำ"}, {"key":"price","score":number,"note":"..."}, {"key":"legal","score":number,"note":"..."}, {"key":"liquidity","score":number,"note":"..."}, {"key":"trend","score":number,"note":"..."}, {"key":"risk","score":number,"note":"..."}, {"key":"returnIfForeclosed","score":number,"note":"..."} ],
  "market_price_estimate": {"low": number, "high": number, "unit": "บาทต่อไร่ หรือ บาทรวมทั้งแปลง ระบุให้ชัด"},
  "resale": {
-   "quick_sale": {"price": number, "timeframe": "เช่น ภายใน 1 เดือน", "note": "เหตุผลสั้น"},
-   "optimal_sale": {"price": number, "timeframe": "เช่น 4-6 เดือน", "note": "เหตุผลสั้น"}
+   "quick_sale": {"price": number, "timeframe": "เช่น ภายใน 1 เดือน", "note": "เหตุผลสั้นไม่เกิน 8 คำ"},
+   "optimal_sale": {"price": number, "timeframe": "เช่น 4-6 เดือน", "note": "เหตุผลสั้นไม่เกิน 8 คำ"}
  },
- "summary": "สรุปภาพรวม 1-2 ประโยค"
+ "summary": "สรุปภาพรวม 1 ประโยคสั้นๆ",
+ "categories": [ {"key":"location","score":number,"note":"เหตุผลสั้นไม่เกิน 8 คำ"}, {"key":"price","score":number,"note":"..."}, {"key":"legal","score":number,"note":"..."}, {"key":"liquidity","score":number,"note":"..."}, {"key":"trend","score":number,"note":"..."}, {"key":"risk","score":number,"note":"..."}, {"key":"returnIfForeclosed","score":number,"note":"..."} ]
 }`;
 
 /* ---------------------------------------------------------
