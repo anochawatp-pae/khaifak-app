@@ -42,6 +42,12 @@ const FONT_CSS = `
 /* ---------------------------------------------------------
    HELPERS
 --------------------------------------------------------- */
+function dataUrlToPart(dataUrl) {
+  const match = /^data:([^;]+);base64,(.*)$/.exec(dataUrl);
+  if (!match) return null;
+  return { mimeType: match[1], data: match[2] };
+}
+
 function uid() { return Math.random().toString(36).slice(2, 10); }
 
 function withTimeout(promise, ms, message) {
@@ -221,7 +227,8 @@ const DEFAULT_COST_CALC = {
 
 const EMPTY_PLOT = {
   code: "", province: "", district: "", subdistrict: "",
-  sizeRai: "", sizeNgan: "", sizeWah: "", deedType: "โฉนดที่ดิน",
+  sizeRai: "", sizeNgan: "", sizeWah: "", deedType: "โฉนดที่ดิน", deedNumber: "",
+  coordinates: "",
   appraisedValue: "", contractAmount: "", monthlyReturn: "",
   contractDate: "", dueDate: "", status: "active", notes: "",
   manualScore: "",
@@ -305,6 +312,9 @@ function PlotForm({ initial, onSave, onCancel }) {
         </Field>
         <Field label="ตำบล/แขวง">
           <input className="kf-sans px-3 py-2 rounded" style={inputStyle()} value={f.subdistrict} onChange={set("subdistrict")} />
+        </Field>
+        <Field label="พิกัด GPS จาก Google Maps (ถ้ามี)">
+          <input className="kf-sans px-3 py-2 rounded" style={inputStyle()} value={f.coordinates} onChange={set("coordinates")} placeholder="เช่น 13.7563, 100.5018" />
         </Field>
         <div className="grid grid-cols-3 gap-2">
           <Field label="ไร่"><input type="number" className="kf-sans px-2 py-2 rounded" style={inputStyle()} value={f.sizeRai} onChange={set("sizeRai")} /></Field>
@@ -567,6 +577,16 @@ function PlotCard({ plot, onEdit, onDelete }) {
           <div className="kf-sans text-xs flex items-center gap-1 mt-0.5" style={{ color: C.inkSoft }}>
             <MapPin size={12} /> {[plot.subdistrict, plot.district, plot.province].filter(Boolean).join(" / ") || "ไม่ระบุที่ตั้ง"}
           </div>
+          {plot.coordinates && plot.coordinates.trim() && (
+            <a
+              href={`https://www.google.com/maps?q=${encodeURIComponent(plot.coordinates.trim())}`}
+              target="_blank" rel="noreferrer"
+              className="kf-sans text-xs flex items-center gap-1 mt-0.5"
+              style={{ color: C.seal }}
+            >
+              <ExternalLink size={11} /> เปิดใน Google Maps
+            </a>
+          )}
         </div>
         <div className="flex flex-col items-end gap-1.5">
           <Seal tone={statusTone}>{statusLabel}</Seal>
@@ -721,8 +741,8 @@ function PortfolioTab({ plots, setPlots }) {
    ANALYSIS TAB
 --------------------------------------------------------- */
 const EMPTY_BROKER = {
-  province: "", district: "", sizeRai: "", deedType: "โฉนดที่ดิน",
-  askingPrice: "", appraisedValue: "", features: "",
+  province: "", district: "", sizeRai: "", deedType: "โฉนดที่ดิน", deedNumber: "",
+  coordinates: "", askingPrice: "", appraisedValue: "", features: "",
 };
 const EMPTY_SEARCH = { province: "", budget: "", sizeWanted: "", purpose: "" };
 
@@ -798,20 +818,25 @@ function buildAnalysisPrompt(f) {
 อำเภอ: ${f.district || "ไม่ระบุ"}
 ขนาด: ${f.sizeRai || "ไม่ระบุ"} ไร่
 ประเภทเอกสารสิทธิ์: ${f.deedType || "ไม่ระบุ"}
+เลขที่โฉนด/เอกสารสิทธิ์ (ถ้ามี): ${f.deedNumber || "ไม่ระบุ"}
+พิกัด GPS (ถ้ามี): ${f.coordinates || "ไม่ระบุ"}
 ราคาที่เสนอ/ต้องการวงเงิน: ${f.askingPrice || "ไม่ระบุ"} บาท
 ราคาประเมินราชการ (ถ้ามี): ${f.appraisedValue || "ไม่ทราบ"} บาท
 รายละเอียด/จุดเด่น/ข้อจำกัด: ${f.features || "ไม่มีข้อมูลเพิ่มเติม"}
+(หมายเหตุ: เลขที่โฉนดมีไว้เพื่ออ้างอิงในรายงานเท่านั้น ฐานข้อมูลกรมที่ดินไม่เปิดให้ค้นจากเว็บทั่วไปได้ ไม่ต้องพยายามค้นหาข้อมูลกรรมสิทธิ์จากเลขนี้ ส่วนพิกัด GPS ถ้ามีให้ใช้ประกอบการประเมินทำเลเท่าที่ทราบจากความรู้ทั่วไปเกี่ยวกับพื้นที่นั้น)
+ถ้ามีรูปภาพแนบมาด้วย ให้วิเคราะห์สภาพจริงจากรูปประกอบการให้คะแนนด้วย เช่น สภาพถนน/ทางเข้าออก รูปร่างแปลง สิ่งปลูกสร้างข้างเคียง สภาพพืชพรรณ/การใช้ประโยชน์ที่ดินที่เห็นในรูป
 
-ให้คะแนนแต่ละด้าน (0-10) ได้แก่ ทำเลและศักยภาพ, ราคาต่อรองเทียบราคาตลาด, เอกสารสิทธิ์และกฎหมาย, สภาพคล่องในการขายต่อ, แนวโน้มมูลค่าในอนาคต, ความเสี่ยงและข้อจำกัด, ผลตอบแทนกรณีหลุดเป็นกรรมสิทธิ์ ในหัวข้อ "ความเสี่ยงและข้อจำกัด" ต้องตรวจสอบและระบุสีผังเมือง/ประเภทการใช้ประโยชน์ที่ดินตามกฎกระทรวงผังเมืองรวมของพื้นที่นั้น (เช่น เขตเกษตรกรรม เขตอนุรักษ์ชนบทและเกษตรกรรม เขตที่อยู่อาศัย เขตอุตสาหกรรม หรือข้อห้าม/ข้อจำกัดการก่อสร้างและการใช้ประโยชน์ที่ดิน) และนำผลกระทบต่อมูลค่าและการขายต่อมาคิดรวมในคะแนนด้วย แล้วสรุปคะแนนรวม เกณฑ์ 9.0 ขึ้นไปถือว่าน่าลงทุน พร้อมประเมินราคาตลาด และประเมินราคาขายต่อ 2 แบบ คือขายเร็ว(ขายด่วน)กับขายแบบเหมาะสม(รอราคาดี) กรณีที่ดินหลุดเป็นกรรมสิทธิ์ของผู้รับซื้อฝาก ค้นข้อมูลราคาที่ดินในย่านนั้นจากอินเทอร์เน็ตประกอบการประเมินถ้าเป็นไปได้
+ให้คะแนนแต่ละด้าน (0-10) ได้แก่ ทำเลและศักยภาพ, ราคาต่อรองเทียบราคาตลาด, เอกสารสิทธิ์และกฎหมาย, สภาพคล่องในการขายต่อ, แนวโน้มมูลค่าในอนาคต, ความเสี่ยงและข้อจำกัด, ผลตอบแทนกรณีหลุดเป็นกรรมสิทธิ์ ในหัวข้อ "ความเสี่ยงและข้อจำกัด" ต้องตรวจสอบและระบุสีผังเมือง/ประเภทการใช้ประโยชน์ที่ดินตามกฎกระทรวงผังเมืองรวมของพื้นที่นั้น (เช่น เขตเกษตรกรรม เขตอนุรักษ์ชนบทและเกษตรกรรม เขตที่อยู่อาศัย เขตอุตสาหกรรม หรือข้อห้าม/ข้อจำกัดการก่อสร้างและการใช้ประโยชน์ที่ดิน) และนำผลกระทบต่อมูลค่าและการขายต่อมาคิดรวมในคะแนนด้วย แล้วสรุปคะแนนรวม เกณฑ์ 9.0 ขึ้นไปถือว่าน่าลงทุน พร้อมประเมินราคาตลาด และ**ต้องประเมินราคาขายต่อทั้ง 2 แบบเสมอ ห้ามเว้นว่างหรือใส่ 0** คือขายเร็ว(ขายด่วน)กับขายแบบเหมาะสม(รอราคาดี) โดยอิงจากราคา/ทำเลที่ให้มาประกอบกับความรู้ทั่วไปเรื่องราคาที่ดินในพื้นที่นั้น แม้จะไม่ได้ค้นเว็บเพิ่มเติมก็ตาม กรณีที่ดินหลุดเป็นกรรมสิทธิ์ของผู้รับซื้อฝาก ค้นข้อมูลราคาที่ดินในย่านนั้นจากอินเทอร์เน็ตประกอบการประเมินถ้าเป็นไปได้
 
 ${ANALYSIS_SCHEMA_NOTE}`;
 }
 
-async function analyzeLand(f, useSearch = true) {
+async function analyzeLand(f, useSearch = true, images = []) {
   return callClaude({
     system: "คุณคือผู้เชี่ยวชาญประเมินที่ดินและความเสี่ยงธุรกิจขายฝากในประเทศไทย ตอบเป็น JSON เท่านั้น",
     prompt: buildAnalysisPrompt(f),
     useSearch,
+    images,
   });
 }
 
@@ -825,9 +850,33 @@ function AnalysisTab({ history, setHistory }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [analysisImage, setAnalysisImage] = useState(null); // { mimeType, data, previewUrl }
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageError, setImageError] = useState("");
+  const imageInputRef = useRef(null);
 
   const setB = (k) => (e) => setBrokerForm({ ...brokerForm, [k]: e.target.value });
   const setS = (k) => (e) => setSearchForm({ ...searchForm, [k]: e.target.value });
+
+  const openImagePicker = () => { if (imageInputRef.current) imageInputRef.current.click(); };
+
+  const handleAnalysisImage = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setImageBusy(true); setImageError("");
+    try {
+      const dataUrl = await compressImage(file, 1000, 0.6);
+      const part = dataUrlToPart(dataUrl);
+      if (!part) throw new Error("อ่านไฟล์รูปไม่สำเร็จ");
+      setAnalysisImage({ ...part, previewUrl: dataUrl });
+    } catch (err) {
+      setImageError("แนบรูปไม่สำเร็จ: " + (err.message || "ลองใหม่อีกครั้ง"));
+    }
+    setImageBusy(false);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  };
+
+  const removeAnalysisImage = () => { setAnalysisImage(null); setImageError(""); };
 
   const runSearch = async () => {
     setSearching(true); setError(""); setCandidates(null); setSelected(null); setResult(null);
@@ -866,7 +915,8 @@ function AnalysisTab({ history, setHistory }) {
   const runAnalysis = async () => {
     setAnalyzing(true); setError(""); setResult(null);
     try {
-      const data = await analyzeLand(brokerForm);
+      const images = analysisImage ? [{ mimeType: analysisImage.mimeType, data: analysisImage.data }] : [];
+      const data = await analyzeLand(brokerForm, true, images);
       setResult(data);
     } catch (e) {
       setError("วิเคราะห์ไม่สำเร็จ: " + (e.message || "ลองใหม่อีกครั้ง"));
@@ -956,12 +1006,54 @@ function AnalysisTab({ history, setHistory }) {
                 <option>โฉนดที่ดิน</option><option>นส.3ก</option><option>นส.3</option><option>ส.ค.1</option><option>อื่นๆ</option>
               </select>
             </Field>
+            <Field label="เลขที่โฉนด/เอกสารสิทธิ์ (ถ้ามี)">
+              <input className="kf-sans px-3 py-2 rounded" style={inputStyle()} value={brokerForm.deedNumber} onChange={setB("deedNumber")} placeholder="เช่น 12345" />
+            </Field>
+            <Field label="พิกัด GPS จาก Google Maps (ถ้ามี)">
+              <input className="kf-sans px-3 py-2 rounded" style={inputStyle()} value={brokerForm.coordinates} onChange={setB("coordinates")} placeholder="เช่น 13.7563, 100.5018" />
+            </Field>
+            {brokerForm.coordinates.trim() && (
+              <div className="col-span-2 -mt-2">
+                <a
+                  href={`https://www.google.com/maps?q=${encodeURIComponent(brokerForm.coordinates.trim())}`}
+                  target="_blank" rel="noreferrer"
+                  className="kf-sans text-xs flex items-center gap-1"
+                  style={{ color: C.seal }}
+                >
+                  <ExternalLink size={11} /> เปิดดูตำแหน่งนี้ใน Google Maps
+                </a>
+              </div>
+            )}
             <Field label="ราคาที่เสนอ/วงเงินที่ต้องการ (บาท)"><input className="kf-sans px-3 py-2 rounded" style={inputStyle()} value={brokerForm.askingPrice} onChange={setB("askingPrice")} /></Field>
             <Field label="ราคาประเมินราชการ (ถ้ามี)"><input className="kf-sans px-3 py-2 rounded" style={inputStyle()} value={brokerForm.appraisedValue} onChange={setB("appraisedValue")} /></Field>
             <div className="col-span-2">
               <Field label="รายละเอียด/จุดเด่น/ข้อจำกัด">
                 <textarea className="kf-sans px-3 py-2 rounded" style={inputStyle()} rows={2} value={brokerForm.features} onChange={setB("features")} placeholder="เช่น ติดถนนลาดยาง, รูปแปลงสวย, ใกล้ชุมชน, ทางเข้าแคบ ฯลฯ" />
               </Field>
+            </div>
+            <div className="col-span-2">
+              <div className="kf-sans text-sm mb-1" style={{ color: C.inkSoft }}>รูปแผนที่/รูปที่ดิน ให้ AI ดูประกอบการวิเคราะห์ (ถ้ามี)</div>
+              <input ref={imageInputRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAnalysisImage} disabled={imageBusy} />
+              {analysisImage ? (
+                <div className="flex items-center gap-3">
+                  <img src={analysisImage.previewUrl} alt="รูปประกอบการวิเคราะห์" className="w-20 h-20 object-cover rounded" style={{ border: `1px solid ${C.line}` }} />
+                  <div className="flex flex-col gap-1">
+                    <button type="button" onClick={openImagePicker} className="kf-sans text-xs text-left" style={{ color: C.inkSoft }}>เปลี่ยนรูป</button>
+                    <button type="button" onClick={removeAnalysisImage} className="kf-sans text-xs text-left" style={{ color: C.bad }}>ลบรูป</button>
+                  </div>
+                </div>
+              ) : (
+                <button type="button" onClick={openImagePicker} disabled={imageBusy} className="kf-sans text-xs px-3 py-2 rounded inline-flex items-center gap-1.5" style={{ background: C.panelDeep, color: C.inkSoft }}>
+                  {imageBusy ? <Loader2 size={13} className="animate-spin" /> : <Camera size={13} />}
+                  {imageBusy ? "กำลังแนบรูป..." : "แนบรูป (สกรีนช็อตแผนที่ หรือรูปถ่ายที่ดิน)"}
+                </button>
+              )}
+              {imageError && <div className="kf-sans text-xs mt-1" style={{ color: C.bad }}>{imageError}</div>}
+            </div>
+            <div className="col-span-2 -mt-1">
+              <div className="kf-sans text-xs" style={{ color: C.inkSoft }}>
+                หมายเหตุ: เลขโฉนดใช้เพื่ออ้างอิง/บันทึกไว้ตรวจสอบภายหลัง ฐานข้อมูลกรมที่ดินไม่เปิดให้ AI ค้นจากเลขนี้โดยตรง จึงไม่ได้เพิ่มความแม่นยำของคะแนนโดยอัตโนมัติ ส่วนพิกัด GPS และรูปที่แนบ AI จะใช้ประกอบการประเมินทำเลได้จริง
+              </div>
             </div>
           </div>
           <button onClick={runAnalysis} disabled={analyzing} className="kf-sans mt-4 px-4 py-2 rounded text-sm text-white flex items-center gap-1.5" style={{ background: C.ink, opacity: analyzing ? 0.6 : 1 }}>

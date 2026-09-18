@@ -4,11 +4,11 @@ import { extractJSON } from "./jsonRepair";
 // so the rest of the app (buildAnalysisPrompt, analyzeLand, AnalysisTab, RecommendedTab)
 // needs no changes at all — only this function's internals point at Gemini now
 // instead of Claude, via our own Netlify Function (keeps the API key server-side).
-export async function callClaude({ system, prompt, useSearch }) {
+export async function callClaude({ system, prompt, useSearch, images }) {
   const res = await fetch("/.netlify/functions/gemini", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ system, prompt, useSearch }),
+    body: JSON.stringify({ system, prompt, useSearch, images }),
   });
 
   let data;

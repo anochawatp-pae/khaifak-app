@@ -1,5 +1,5 @@
 // Netlify Function: POST /.netlify/functions/gemini
-// Body: { system: string, prompt: string, useSearch: boolean }
+// Body: { system: string, prompt: string, useSearch: boolean, images?: [{mimeType, data}] }
 // Keeps GEMINI_API_KEY server-side only — never sent to the browser.
 
 export const handler = async (event) => {
@@ -22,7 +22,7 @@ export const handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: "Invalid JSON body" }) };
   }
 
-  const { system, prompt, useSearch } = payload;
+  const { system, prompt, useSearch, images } = payload;
   if (!prompt) {
     return { statusCode: 400, body: JSON.stringify({ error: "Missing prompt" }) };
   }
@@ -32,9 +32,19 @@ export const handler = async (event) => {
   // GEMINI_MODEL env var without redeploying code.
   const model = process.env.GEMINI_MODEL || "gemini-3.6-flash";
 
+  const parts = [];
+  if (Array.isArray(images)) {
+    for (const img of images) {
+      if (img && img.mimeType && img.data) {
+        parts.push({ inline_data: { mime_type: img.mimeType, data: img.data } });
+      }
+    }
+  }
+  parts.push({ text: prompt });
+
   const body = {
-    contents: [{ role: "user", parts: [{ text: prompt }] }],
-    generationConfig: { maxOutputTokens: 2048, temperature: 0.4 },
+    contents: [{ role: "user", parts }],
+    generationConfig: { maxOutputTokens: 3200, temperature: 0.4 },
   };
   if (system) {
     body.systemInstruction = { parts: [{ text: system }] };
