@@ -763,6 +763,20 @@ function normalizeAnalysis(r) {
 function AnalysisResult({ result: raw, sourceLabel, onSaveHistory, threshold = 9.0 }) {
   const result = normalizeAnalysis(raw);
   const pass = result.overall_score >= threshold;
+  const [saveState, setSaveState] = useState("idle"); // idle | saving | saved | error
+  const [saveErr, setSaveErr] = useState("");
+
+  const handleSave = async () => {
+    setSaveState("saving"); setSaveErr("");
+    try {
+      await onSaveHistory();
+      setSaveState("saved");
+    } catch (err) {
+      setSaveState("error");
+      setSaveErr(err.message || "บันทึกไม่สำเร็จ");
+    }
+  };
+
   return (
     <div className="kf-in mt-5 rounded-lg p-5" style={{ background: C.panel, border: `1px solid ${C.line}` }}>
       <div className="flex items-center justify-between mb-3">
@@ -803,10 +817,20 @@ function AnalysisResult({ result: raw, sourceLabel, onSaveHistory, threshold = 9
         </div>
       </div>
 
-      <div className="flex justify-end mt-4">
-        <button onClick={onSaveHistory} className="kf-sans text-sm px-4 py-2 rounded text-white flex items-center gap-1.5" style={{ background: C.ink }}>
-          <Archive size={14} /> บันทึกลงประวัติการวิเคราะห์
+      <div className="flex flex-col items-end mt-4 gap-1">
+        <button
+          onClick={handleSave}
+          disabled={saveState === "saving"}
+          className="kf-sans text-sm px-4 py-2 rounded text-white flex items-center gap-1.5"
+          style={{ background: saveState === "error" ? C.bad : C.ink, opacity: saveState === "saving" ? 0.6 : 1 }}
+        >
+          {saveState === "saving" && <Loader2 size={14} className="animate-spin" />}
+          {saveState === "saving" ? "กำลังบันทึก..." :
+            saveState === "saved" ? "บันทึกแล้ว ✓" :
+            saveState === "error" ? "ลองบันทึกอีกครั้ง" :
+            <><Archive size={14} /> บันทึกลงประวัติการวิเคราะห์</>}
         </button>
+        {saveState === "error" && <div className="kf-sans text-xs" style={{ color: C.bad }}>{saveErr}</div>}
       </div>
     </div>
   );
@@ -923,9 +947,12 @@ function AnalysisTab({ history, setHistory }) {
     } finally { setAnalyzing(false); }
   };
 
-  const saveToHistory = () => {
+  const saveToHistory = async () => {
     if (!result) return;
-    setHistory([{ id: uid(), date: new Date().toISOString(), source: mode, form: brokerForm, result }, ...history]);
+    const entry = { id: uid(), date: new Date().toISOString(), source: mode, form: brokerForm, result };
+    const next = [entry, ...history];
+    await storage.set("khaifak_analysis_history", JSON.stringify(next));
+    setHistory(next);
   };
 
   return (
@@ -1080,6 +1107,13 @@ const INVEST_THRESHOLD = 8.5;
 
 function RecommendedCard({ candidate, result: rawResult, onSave }) {
   const result = normalizeAnalysis(rawResult);
+  const [saveState, setSaveState] = useState("idle");
+  const [saveErr, setSaveErr] = useState("");
+  const handleSave = async () => {
+    setSaveState("saving"); setSaveErr("");
+    try { await onSave(); setSaveState("saved"); }
+    catch (err) { setSaveState("error"); setSaveErr(err.message || "บันทึกไม่สำเร็จ"); }
+  };
   return (
     <div className="kf-in rounded-lg p-4" style={{ background: C.panel, border: `1px solid ${C.good}` }}>
       <div className="flex justify-between items-start mb-2">
@@ -1111,9 +1145,21 @@ function RecommendedCard({ candidate, result: rawResult, onSave }) {
             <ExternalLink size={11} /> ดูประกาศต้นทาง
           </a>
         ) : <span />}
-        <button onClick={onSave} className="kf-sans text-xs px-3 py-1.5 rounded text-white flex items-center gap-1" style={{ background: C.ink }}>
-          <Archive size={12} /> บันทึกลงประวัติ
-        </button>
+        <div className="flex flex-col items-end gap-1">
+          <button
+            onClick={handleSave}
+            disabled={saveState === "saving"}
+            className="kf-sans text-xs px-3 py-1.5 rounded text-white flex items-center gap-1"
+            style={{ background: saveState === "error" ? C.bad : C.ink, opacity: saveState === "saving" ? 0.6 : 1 }}
+          >
+            {saveState === "saving" && <Loader2 size={12} className="animate-spin" />}
+            {saveState === "saving" ? "กำลังบันทึก..." :
+              saveState === "saved" ? "บันทึกแล้ว ✓" :
+              saveState === "error" ? "ลองใหม่" :
+              <><Archive size={12} /> บันทึกลงประวัติ</>}
+          </button>
+          {saveState === "error" && <div className="kf-sans text-[11px]" style={{ color: C.bad }}>{saveErr}</div>}
+        </div>
       </div>
     </div>
   );
@@ -1171,8 +1217,11 @@ function RecommendedTab({ history, setHistory }) {
     } finally { setRunning(false); setProgress(""); }
   };
 
-  const saveOne = (candidate, result) => {
-    setHistory([{ id: uid(), date: new Date().toISOString(), source: "ai-recommended", form: { province: candidate.location, district: "", sizeRai: candidate.size }, result }, ...history]);
+  const saveOne = async (candidate, result) => {
+    const entry = { id: uid(), date: new Date().toISOString(), source: "ai-recommended", form: { province: candidate.location, district: "", sizeRai: candidate.size }, result };
+    const next = [entry, ...history];
+    await storage.set("khaifak_analysis_history", JSON.stringify(next));
+    setHistory(next);
   };
 
   return (
